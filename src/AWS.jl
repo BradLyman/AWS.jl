@@ -152,16 +152,16 @@ RestJSONService(name::String, api_version::String) = RestJSONService(name, api_v
 
 # without headers but with an auth scope override
 RestJSONService(
-  name::String,
-  api_version::String,
-  auth_scope::String
+    name::String,
+    api_version::String,
+    auth_scope::String
 ) = RestJSONService(name, api_version, Some(auth_scope), LittleDict{String, String}())
 
 # with headers but no auth scope override
 RestJSONService(
-  name::String,
-  api_version::String,
-  service_specific_headers::LittleDict{String, String}
+    name::String,
+    api_version::String,
+    service_specific_headers::LittleDict{String, String}
 ) = RestJSONService(name, api_version, nothing, service_specific_headers)
 
 Base.@kwdef mutable struct Request
@@ -229,11 +229,11 @@ function _sign_aws2!(aws::AWSConfig, request::Request, time::DateTime)
 end
 
 function _service_auth_scope_v4(request::Request)
-  if request.auth_scope === nothing
-    request.service
-  else
-    something(request.auth_scope)
-  end
+    if request.auth_scope === nothing
+        request.service
+    else
+        something(request.auth_scope)
+    end
 end
 
 function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
