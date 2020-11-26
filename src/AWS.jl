@@ -246,7 +246,6 @@ function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     # Authentication scope...
     service_scope = _service_auth_scope_v4(request)
 
-    @info "Using service scope $(service_scope)"
     authentication_scope = [date, aws.region, service_scope, "aws4_request"]
 
     creds = check_credentials(aws.credentials)
@@ -713,7 +712,7 @@ function (service::RestJSONService)(
     request = Request(
         service=service.name,
         api_version=service.api_version,
-        scope=service.scope,
+        auth_scope=service.auth_scope,
         request_method=request_method,
         headers=LittleDict{String, String}(get(args, "headers", [])),
         resource=_generate_rest_resource(request_uri, args),

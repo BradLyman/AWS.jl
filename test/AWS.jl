@@ -101,6 +101,27 @@ end
         @test authorization_header[3] == "SignedHeaders=content-md5;content-type;host;user-agent;x-amz-content-sha256;x-amz-date,"
         @test authorization_header[4] == "Signature=0f292eaf0b66cf353bafcb1b9b6d90ee27064236a60f17f6fc5bd7d40173a0be"
     end
+
+    @testset "sign v4 with scope override" begin
+        expected_x_amz_content_sha256 = bytes2hex(digest(MD_SHA256, request.content))
+        expected_content_md5 = base64encode(digest(MD_MD5, request.content))
+        expected_x_amz_date = Dates.format(time, dateformat"yyyymmdd\THHMMSS\Z")
+        request.auth_scope = Some("other_service_name")
+
+        result = AWS._sign_aws4!(aws, request, time)
+        headers = result.headers
+
+        @test headers["x-amz-content-sha256"] == expected_x_amz_content_sha256
+        @test headers["Content-MD5"] == expected_content_md5
+        @test headers["x-amz-date"] == expected_x_amz_date
+
+        authorization_header = split(headers["Authorization"], ' ')
+        @test length(authorization_header) == 4
+        @test authorization_header[1] == "AWS4-HMAC-SHA256"
+        @test authorization_header[2] == "Credential=$access_key/$date/us-east-1/$(something(request.auth_scope))/aws4_request,"
+        @test authorization_header[3] == "SignedHeaders=content-md5;content-type;host;user-agent;x-amz-content-sha256;x-amz-date,"
+        @test authorization_header[4] == "Signature=11a6118993e3dbed003c396604fc18de3bbabf92e673152ae62c02dd98533406"
+    end
 end
 
 @testset "submit_request" begin
@@ -464,7 +485,7 @@ end
 
         function _get_secret_string(secret_name)
             response = Secrets_Manager.get_secret_value(secret_name)
-            
+
             return response["SecretString"]
         end
 
@@ -478,7 +499,7 @@ end
 
         @test_throws AWSException _get_secret_string(secret_name)
     end
-    
+
     @testset "low-level secrets manager" begin
         secret_name = "aws-jl-test---" * _now_formatted()
         secret_string = "sshhh it is a secret!"
@@ -494,7 +515,7 @@ end
             "SecretString"=>secret_string,
             "ClientRequestToken"=>string(uuid4()),
         ))
-        
+
         try
             @test _get_secret_string(secret_name) == secret_string
         finally
@@ -571,7 +592,7 @@ end
 
     @testset "high-level sqs" begin
         @service SQS
-        
+
         queue_name = "aws-jl-test---" * _now_formatted()
         expected_message = "Hello for AWS.jl"
 
@@ -584,8 +605,8 @@ end
         # Create Queue
         SQS.create_queue(queue_name)
         queue_url = _get_queue_url(queue_name)
-        
-        try 
+
+        try
             # Get Queues
             @test !isempty(queue_url)
 
@@ -611,7 +632,7 @@ end
             @test message_id == expected_message_id
 
             SQS.send_message(expected_message, queue_url)
-            
+
             result = SQS.receive_message(queue_url)
             message = result["ReceiveMessageResult"]["Message"]["Body"]
             @test message == expected_message
@@ -679,7 +700,7 @@ end
         finally
             AWSServices.sqs("DeleteQueue", LittleDict("QueueUrl" => queue_url))
         end
-        
+
         @test_throws AWSException _get_queue_url(queue_name)
     end
 end
@@ -720,7 +741,7 @@ end
             # GET operation
             result = S3.list_objects(bucket_name)
             @test result["Contents"]["Key"] == file_name
-            
+
             # GET with parameters operation
             max_keys = 1
             result = S3.list_objects(bucket_name, Dict("max_keys" => max_keys))
@@ -772,7 +793,7 @@ end
             # GET operation
             result = AWSServices.s3("GET", "/$bucket_name")
             @test result["Contents"]["Key"] == file_name
-            
+
             # GET with parameters operation
             max_keys = 1
             result = AWSServices.s3("GET", "/$bucket_name", Dict("max_keys" => max_keys))
