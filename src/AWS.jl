@@ -212,6 +212,10 @@ function _sign_aws2!(aws::AWSConfig, request::Request, time::DateTime)
     return request
 end
 
+function _service_scope_v4(service_name::AbstractString)
+  service_name
+end
+
 function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     # Create AWS Signature Version 4 Authentication Headers.
     # http://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
@@ -220,7 +224,8 @@ function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     datetime = Dates.format(time, dateformat"yyyymmdd\THHMMSS\Z")
 
     # Authentication scope...
-    authentication_scope = [date, aws.region, request.service, "aws4_request"]
+    authentication_scope =
+      [date, aws.region, _service_scope_v4(request.service), "aws4_request"]
 
     creds = check_credentials(aws.credentials)
     signing_key = "AWS4$(creds.secret_key)"
@@ -500,7 +505,7 @@ end
 
 """
     (service::RestXMLService)(
-        request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, String}(); 
+        request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, String}();
         aws::AWSConfig=aws_config
     )
 
@@ -518,7 +523,7 @@ Perform a RestXML request to AWS.
 - `Tuple or Dict`: If `return_headers` is passed in through `args` a Tuple containing the Headers and Response will be returned, otherwise just a Dict
 """
 function (service::RestXMLService)(
-    request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+    request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
     aws_config::AWSConfig=global_aws_config(),
 )
     request = Request(
@@ -560,7 +565,7 @@ end
 
 """
     (service::QueryService)(
-        operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+        operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
         aws::AWSConfig=aws_config
     )
 
@@ -577,7 +582,7 @@ Perform a Query request to AWS.
 - `Tuple or Dict`: If `return_headers` is passed in through `args` a Tuple containing the Headers and Response will be returned, otherwise just a Dict
 """
 function (service::QueryService)(
-    operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+    operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
     aws_config::AWSConfig=global_aws_config(),
 )
     POST_RESOURCE = "/"
