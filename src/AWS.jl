@@ -143,13 +143,26 @@ end
 struct RestJSONService
     name::String
     api_version::String
-    auth_scope::Union{Some{String}, Nothing}
 
+    auth_scope::Union{Some{String}, Nothing}
     service_specific_headers::LittleDict{String, String}
 end
 
 RestJSONService(name::String, api_version::String) = RestJSONService(name, api_version, nothing, LittleDict{String, String}())
-RestJSONService(name::String, api_version::String, auth_scope::String) = RestJSONService(name, api_version, Some(auth_scope), LittleDict{String, String}())
+
+# without headers but with an auth scope override
+RestJSONService(
+  name::String,
+  api_version::String,
+  auth_scope::String
+) = RestJSONService(name, api_version, Some(auth_scope), LittleDict{String, String}())
+
+# with headers but no auth scope override
+RestJSONService(
+  name::String,
+  api_version::String,
+  service_specific_headers::LittleDict{String, String}
+) = RestJSONService(name, api_version, nothing, service_specific_headers)
 
 Base.@kwdef mutable struct Request
     service::String
