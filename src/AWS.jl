@@ -213,7 +213,11 @@ function _sign_aws2!(aws::AWSConfig, request::Request, time::DateTime)
 end
 
 function _service_scope_v4(service_name::AbstractString)
-  service_name
+  if service_name == "runtime.lex"
+    "lex"
+  else
+    service_name
+  end
 end
 
 function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
@@ -224,8 +228,10 @@ function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     datetime = Dates.format(time, dateformat"yyyymmdd\THHMMSS\Z")
 
     # Authentication scope...
-    authentication_scope =
-      [date, aws.region, _service_scope_v4(request.service), "aws4_request"]
+    service_scope = _service_scope_v4(request.service)
+
+    @info "Using service scope $(service_scope)"
+    authentication_scope = [date, aws.region, service_scope, "aws4_request"]
 
     creds = check_credentials(aws.credentials)
     signing_key = "AWS4$(creds.secret_key)"
