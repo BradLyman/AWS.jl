@@ -143,14 +143,17 @@ end
 struct RestJSONService
     name::String
     api_version::String
+    auth_scope::Union{Some{String}, Nothing}
 
     service_specific_headers::LittleDict{String, String}
 end
 
-RestJSONService(name::String, api_version::String) = RestJSONService(name, api_version, LittleDict{String, String}())
+RestJSONService(name::String, api_version::String) = RestJSONService(name, api_version, nothing, LittleDict{String, String}())
+RestJSONService(name::String, api_version::String, auth_scope::String) = RestJSONService(name, api_version, Some(auth_scope), LittleDict{String, String}())
 
 Base.@kwdef mutable struct Request
     service::String
+    auth_scope::Union{Some{String}, Nothing}=nothing
     api_version::String
     request_method::String
 
@@ -212,11 +215,11 @@ function _sign_aws2!(aws::AWSConfig, request::Request, time::DateTime)
     return request
 end
 
-function _service_scope_v4(service_name::AbstractString)
-  if service_name == "runtime.lex"
-    "lex"
+function _service_auth_scope_v4(request::Request)
+  if request.auth_scope === nothing
+    request.service
   else
-    service_name
+    something(request.auth_scope)
   end
 end
 
@@ -228,7 +231,7 @@ function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     datetime = Dates.format(time, dateformat"yyyymmdd\THHMMSS\Z")
 
     # Authentication scope...
-    service_scope = _service_scope_v4(request.service)
+    service_scope = _service_auth_scope_v4(request)
 
     @info "Using service scope $(service_scope)"
     authentication_scope = [date, aws.region, service_scope, "aws4_request"]
@@ -697,6 +700,7 @@ function (service::RestJSONService)(
     request = Request(
         service=service.name,
         api_version=service.api_version,
+        scope=service.scope,
         request_method=request_method,
         headers=LittleDict{String, String}(get(args, "headers", [])),
         resource=_generate_rest_resource(request_uri, args),
