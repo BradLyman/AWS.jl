@@ -144,13 +144,29 @@ struct RestJSONService
     name::String
     api_version::String
 
+    auth_scope::Union{Some{String}, Nothing}
     service_specific_headers::LittleDict{String, String}
 end
 
-RestJSONService(name::String, api_version::String) = RestJSONService(name, api_version, LittleDict{String, String}())
+RestJSONService(name::String, api_version::String) = RestJSONService(name, api_version, nothing, LittleDict{String, String}())
+
+# without headers but with an auth scope override
+RestJSONService(
+  name::String,
+  api_version::String,
+  auth_scope::String
+) = RestJSONService(name, api_version, Some(auth_scope), LittleDict{String, String}())
+
+# with headers but no auth scope override
+RestJSONService(
+  name::String,
+  api_version::String,
+  service_specific_headers::LittleDict{String, String}
+) = RestJSONService(name, api_version, nothing, service_specific_headers)
 
 Base.@kwdef mutable struct Request
     service::String
+    auth_scope::Union{Some{String}, Nothing}=nothing
     api_version::String
     request_method::String
 
@@ -212,6 +228,14 @@ function _sign_aws2!(aws::AWSConfig, request::Request, time::DateTime)
     return request
 end
 
+function _service_auth_scope_v4(request::Request)
+  if request.auth_scope === nothing
+    request.service
+  else
+    something(request.auth_scope)
+  end
+end
+
 function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     # Create AWS Signature Version 4 Authentication Headers.
     # http://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
@@ -220,7 +244,9 @@ function _sign_aws4!(aws::AWSConfig, request::Request, time::DateTime)
     datetime = Dates.format(time, dateformat"yyyymmdd\THHMMSS\Z")
 
     # Authentication scope...
-    authentication_scope = [date, aws.region, request.service, "aws4_request"]
+    service_scope = _service_auth_scope_v4(request)
+
+    authentication_scope = [date, aws.region, service_scope, "aws4_request"]
 
     creds = check_credentials(aws.credentials)
     signing_key = "AWS4$(creds.secret_key)"
@@ -500,7 +526,7 @@ end
 
 """
     (service::RestXMLService)(
-        request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, String}(); 
+        request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, String}();
         aws::AWSConfig=aws_config
     )
 
@@ -518,7 +544,7 @@ Perform a RestXML request to AWS.
 - `Tuple or Dict`: If `return_headers` is passed in through `args` a Tuple containing the Headers and Response will be returned, otherwise just a Dict
 """
 function (service::RestXMLService)(
-    request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+    request_method::String, request_uri::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
     aws_config::AWSConfig=global_aws_config(),
 )
     request = Request(
@@ -560,7 +586,7 @@ end
 
 """
     (service::QueryService)(
-        operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+        operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
         aws::AWSConfig=aws_config
     )
 
@@ -577,7 +603,7 @@ Perform a Query request to AWS.
 - `Tuple or Dict`: If `return_headers` is passed in through `args` a Tuple containing the Headers and Response will be returned, otherwise just a Dict
 """
 function (service::QueryService)(
-    operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}(); 
+    operation::String, args::AbstractDict{String, <:Any}=Dict{String, Any}();
     aws_config::AWSConfig=global_aws_config(),
 )
     POST_RESOURCE = "/"
@@ -686,6 +712,7 @@ function (service::RestJSONService)(
     request = Request(
         service=service.name,
         api_version=service.api_version,
+        auth_scope=service.auth_scope,
         request_method=request_method,
         headers=LittleDict{String, String}(get(args, "headers", [])),
         resource=_generate_rest_resource(request_uri, args),
